@@ -1,3 +1,4 @@
+import os
 import dbus
 import evdev
 import keymap
@@ -24,9 +25,36 @@ class Kbrd:
         #                                     HID_SRVC)
         #self.btk_service = dbus.Interface(self.btkobject,
         #                                  HID_DBUS)
-        self.wait_for_keyboard()
 
-    def wait_for_keyboard(self, event_id=0):
+        # TODO auto detect atreus
+        print("searching for atreus")
+        # atreus_event = self.get_atreus_id()
+        atreus_event = 7
+        print(f"atreus found at event {atreus_event}")
+        
+        self.wait_for_keyboard(event_id=atreus_event)
+
+    def get_atreus_id(self):
+
+        listing = os.listdir("/sys/class/input")
+
+        listing = [path for path in listing if "event" in path]
+
+        names = []
+        atreus_id = -1
+        for path in listing:
+            filename = f"/sys/class/input/{path}/device/name"
+            with open(filename) as f:
+                name = f.readlines()
+                names.append(name)
+                if "Keyboardio Atreus Keyboard" in name:
+                    atreus_id = len(names)
+                    print(filename)
+
+        return atreus_id
+        
+        
+    def wait_for_keyboard(self, event_id=7):
         """
         Connect to the input event file for the keyboard.
         Can take a parameter of an integer that gets appended to the end of
@@ -80,7 +108,7 @@ class Kbrd:
         return [0xA1, 0x01, self.mod_keys, 0, *self.pressed_keys]
 
     def send_keys(self):
-        print("Sending: ", self.state)
+        #print("Sending: ", self.state)
         self.sendCB(self.state)
         #self.btk_service.send_keys(self.state)
 
@@ -92,9 +120,11 @@ class Kbrd:
         print('Listening...')
         for event in self.dev.read_loop():
             # only bother if we hit a key and its an up or down event
+            #print(event)
             if event.type == evdev.ecodes.EV_KEY and event.value < 2:
                 key_str = evdev.ecodes.KEY[event.code]
                 mod_key = keymap.modkey(key_str)
+                #print(f"key {key_str} {mod_key}")
                 if mod_key > -1:
                     self.update_mod_keys(mod_key, event.value)
                 else:
